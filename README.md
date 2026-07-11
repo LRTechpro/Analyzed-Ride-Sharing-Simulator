@@ -6,10 +6,10 @@ This project is the first milestone of an efficient ride-sharing simulation. It 
 
 ## Project Structure
 
-- `car.py` — Defines the `Car` class.
-- `rider.py` — Defines the `Rider` class.
-- `simulation.py` — Defines the `Simulation` controller class.
-- `test_simulation.py` — Creates sample objects and confirms the classes work together.
+- `car.py`: Defines the `Car` class.
+- `rider.py`: Defines the `Rider` class.
+- `simulation.py`: Defines the `Simulation` controller class.
+- `test_simulation.py`: Creates sample objects and confirms the classes work together.
 
 ## How to Run
 
