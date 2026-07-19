@@ -9,7 +9,7 @@ def main() -> None:
     """Create sample objects and verify that the classes work together."""
     car = Car("CAR001", (10, 5))
     rider = Rider("RIDER_A", (1, 2), (20, 15))
-    simulation = Simulation()
+    simulation = Simulation("map.csv")
 
     # Store each object by its unique ID for average O(1) dictionary lookup.
     simulation.cars[car.id] = car
@@ -18,6 +18,7 @@ def main() -> None:
     print(car)
     print(rider)
     print(simulation)
+    print(simulation.map)
 
 
 if __name__ == "__main__":
