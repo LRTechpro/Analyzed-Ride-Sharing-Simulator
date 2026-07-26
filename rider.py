@@ -7,8 +7,8 @@ class Rider:
     def __init__(
         self,
         rider_id: str,
-        start_location: tuple[int, int],
-        destination: tuple[int, int],
+        start_location: str,
+        destination: str,
     ) -> None:
         """Initialize a rider with pickup and dropoff locations."""
         self.id = rider_id

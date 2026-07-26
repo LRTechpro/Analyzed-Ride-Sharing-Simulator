@@ -1,55 +1,101 @@
 # Efficient, Analyzed Ride-Sharing Simulator
 
-## Purpose/Design
+## Purpose and Design
 
-This project is an efficient ride-sharing simulation built through progressive milestones. It uses object-oriented design to model `Car`, `Rider`, `Graph`, and `Simulation` objects as separate, reusable Python classes. Cars and riders are stored in dictionaries keyed by their unique IDs for average O(1) lookup. The weighted, directed city map is loaded from an external CSV file into a dictionary-based adjacency list.
+This project models the core components of a ride-sharing platform with clean,
+reusable Python classes. `Car`, `Rider`, `Graph`, and `Simulation` encapsulate
+the actors and state of the system. Cars and riders are stored in dictionaries
+by unique ID for average O(1) lookup, while the city map uses a weighted,
+directed adjacency list loaded from CSV.
 
 ## Project Structure
 
-- `car.py`: Defines the `Car` class.
+- `car.py`: Defines the `Car` class and its route-planning method.
 - `rider.py`: Defines the `Rider` class.
-- `graph.py`: Defines the weighted, directed `Graph` class and CSV-loading logic.
+- `graph.py`: Defines the weighted `Graph` and CSV-loading logic.
+- `pathfinding.py`: Implements Dijkstra's shortest-path algorithm.
 - `map.csv`: Defines the city nodes, roads, and travel times.
-- `simulation.py`: Defines the `Simulation` controller and loads the city map.
-- `test_simulation.py`: Creates sample objects and demonstrates the integrated graph.
+- `simulation.py`: Stores cars, riders, and the city map.
+- `test_dijkstra.py`: Verifies standalone and car-integrated pathfinding.
+- `test_simulation.py`: Demonstrates the complete object model.
+
+## Pathfinding with Dijkstra's Algorithm
+
+`find_shortest_path(graph, start_node, end_node)` calculates the fastest route
+through the map. It uses Python's `heapq` module as a min-priority queue. Each
+heap entry is a `(distance, node)` tuple, so the closest known node is processed
+first.
+
+The algorithm maintains:
+
+- a distance dictionary containing the best travel time found for each node;
+- a predecessor dictionary used to reconstruct the final route;
+- a min-heap containing nodes that may still improve the route.
+
+For the included map, the fastest route from `A` to `D` is
+`A -> C -> D`, with a total travel time of 4. If a route is unavailable, the
+function returns `(None, float("inf"))`.
+
+`Car.calculate_route(destination, graph)` starts from the car's current
+`location`, calls the pathfinding function, and stores the result in the car's
+`route` and `route_time` attributes.
+
+### Complexity
+
+With an adjacency list and a binary min-heap, Dijkstra's algorithm runs in
+`O((V + E) log V)` time, commonly written as `O(E log V)` for a connected
+graph. The distance and predecessor dictionaries require `O(V)` space, while
+stale entries can make the heap grow to `O(E)`, giving `O(V + E)` auxiliary
+space in the worst case.
 
 ## Map Data Format
 
-Each row in `map.csv` describes one directed road using three comma-separated values:
+Each `map.csv` row describes one directed road:
 
 ```text
 start_node,end_node,travel_time
 ```
 
-For example, `A,B,5` creates a directed road from node `A` to node `B` with a travel time of 5 units. A two-way street requires two rows: one for each direction. The loader accepts an optional header row, ignores blank rows, and converts each travel time to a numeric weight.
+For example, `A,B,5` creates a road from `A` to `B` with a travel time of 5.
+A two-way street requires one row for each direction. The loader accepts an
+optional header, ignores blank rows, validates three-column rows, and rejects
+negative weights.
 
 ## How to Run
 
-1. Open a terminal in the project folder.
-2. Run:
+Use Python 3.10 or newer. No third-party packages are required.
+
+Run the required Dijkstra demonstration:
+
+```bash
+python test_dijkstra.py
+```
+
+Expected result:
+
+```text
+Standalone Dijkstra result:
+  Path: ['A', 'C', 'D']
+  Total travel time: 4
+
+Car.calculate_route() result:
+  Car location: A
+  Destination: D
+  Car route: ['A', 'C', 'D']
+  Car route_time: 4
+
+All pathfinding checks passed.
+```
+
+Run the full simulation demonstration:
 
 ```bash
 python test_simulation.py
 ```
 
-Expected output:
+If `pytest` is installed, the same pathfinding checks can also be collected
+automatically:
 
-```text
-Car CAR001 at (10, 5) - Status: available
-Rider RIDER_A at (1, 2) waiting for ride to (20, 15)
-Simulation with 1 car(s) and 1 rider(s)
---- City Map Adjacency List ---
-A -> [(B, 5), (C, 3)]
-B -> [(A, 5), (D, 4)]
-C -> [(A, 3), (D, 1)]
-D -> [(B, 4), (C, 1)]
--------------------------------
+```bash
+python -m pytest -q
 ```
-
-## Dependencies
-
-None. The project uses only the Python standard library.
-
-## Python Version
-
-Python 3.10 or newer is recommended.
