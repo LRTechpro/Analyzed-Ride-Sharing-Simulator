@@ -14,9 +14,11 @@ directed adjacency list loaded from CSV.
 - `rider.py`: Defines the `Rider` class.
 - `graph.py`: Defines the weighted `Graph` and CSV-loading logic.
 - `pathfinding.py`: Implements Dijkstra's shortest-path algorithm.
+- `quadtree.py`: Implements the Quadtree spatial index and nearest-neighbor search.
 - `map.csv`: Defines the city nodes, roads, and travel times.
 - `simulation.py`: Stores cars, riders, and the city map.
 - `test_dijkstra.py`: Verifies standalone and car-integrated pathfinding.
+- `test_quadtree.py`: Validates Quadtree results against brute-force search.
 - `test_simulation.py`: Demonstrates the complete object model.
 
 ## Pathfinding with Dijkstra's Algorithm
@@ -47,6 +49,46 @@ With an adjacency list and a binary min-heap, Dijkstra's algorithm runs in
 graph. The distance and predecessor dictionaries require `O(V)` space, while
 stale entries can make the heap grow to `O(E)`, giving `O(V + E)` auxiliary
 space in the worst case.
+
+## Quadtree Data Structure
+
+The Quadtree is a two-dimensional spatial index for matching a rider with the
+nearest available driver. Instead of scanning every driver in the fleet, it
+recursively divides the 1000-by-1000 map into northwest, northeast, southwest,
+and southeast regions. Each `QuadtreeNode` holds up to four points before it
+subdivides and redistributes those points among its children.
+
+`Quadtree.find_nearest(query_point)` performs a best-first recursive search.
+Child regions are ordered by their minimum possible distance from the rider.
+Once the search finds a candidate driver, any region whose closest boundary is
+farther than that driver is pruned. Every driver in a pruned branch is skipped.
+Squared distances are used during comparisons to avoid unnecessary square-root
+calculations.
+
+For a reasonably balanced tree and well-distributed points, insertion and
+nearest-neighbor search are approximately `O(log N)` on average. A brute-force
+nearest-neighbor search is `O(N)` because it always examines every driver.
+Quadtree construction requires `O(N)` space. Highly clustered or identical
+locations can produce an unbalanced tree, so worst-case search remains `O(N)`;
+the implementation also uses a maximum depth to handle duplicate locations
+safely.
+
+Run the standalone 5,000-driver verification:
+
+```bash
+python test_quadtree.py
+```
+
+The script inserts 5,000 reproducible random driver points, selects a rider
+location, and runs both the Quadtree and a simple brute-force search. It asserts
+that both methods return the exact same `Point` object and prints their results
+and observed search times. A successful run ends with:
+
+```text
+Results identical:      True
+
+All Quadtree correctness checks passed.
+```
 
 ## Map Data Format
 
