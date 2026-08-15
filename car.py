@@ -1,17 +1,26 @@
 """Car model for the ride-sharing simulator."""
 
+from typing import TYPE_CHECKING
+
 from graph import Graph
 from pathfinding import find_shortest_path
+
+if TYPE_CHECKING:
+    from rider import Rider
+
+
+Coordinates = tuple[float, float]
 
 
 class Car:
     """Represent a vehicle in the ride-sharing fleet."""
 
-    def __init__(self, car_id: str, location: str) -> None:
-        """Initialize a car with an ID and starting location."""
+    def __init__(self, car_id: str, location: Coordinates) -> None:
+        """Initialize a car with an ID and physical map coordinates."""
         self.id = car_id
         self.location = location
         self.status = "available"
+        self.assigned_rider: Rider | None = None
         self.destination: str | None = None
         self.route: list[str] | None = None
         self.route_time = float("inf")
