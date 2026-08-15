@@ -16,10 +16,32 @@ directed adjacency list loaded from CSV.
 - `pathfinding.py`: Implements Dijkstra's shortest-path algorithm.
 - `quadtree.py`: Implements the Quadtree spatial index and nearest-neighbor search.
 - `map.csv`: Defines the city nodes, roads, and travel times.
-- `simulation.py`: Stores cars, riders, and the city map.
+- `simulation.py`: Implements the min-heap event engine and prototype logic.
 - `test_dijkstra.py`: Verifies standalone and car-integrated pathfinding.
 - `test_quadtree.py`: Validates Quadtree results against brute-force search.
 - `test_simulation.py`: Demonstrates the complete object model.
+
+## Simulation Engine Prototype
+
+The prototype connects the `Car`, `Rider`, and `Simulation` classes in a
+complete discrete-event simulation. Physical locations are represented as
+`(x, y)` coordinate tuples. The prototype intentionally uses simplified
+matching and navigation so the event loop and state changes can be validated
+before Dijkstra pathfinding and the Quadtree are integrated.
+
+Upcoming events are stored in a min-heap as
+`(timestamp, sequence_number, event_type, data)` tuples. The timestamp keeps
+events chronological, and the sequence number preserves insertion order when
+two events have the same timestamp. The `run()` loop removes the earliest
+event, advances the simulation clock, and sends it to the correct handler.
+
+For each rider request, `find_closest_car_brute_force()` checks every available
+car and returns the closest one. `calculate_travel_time()` uses Manhattan
+distance multiplied by `TRAVEL_SPEED_FACTOR`. An `ARRIVAL` event represents
+either a pickup or a dropoff. The handler distinguishes them by checking the
+car's status. At pickup, the car location changes to the rider's start
+coordinates. At dropoff, it changes to the rider's destination, the car becomes
+available again, and the rider-car link is cleared.
 
 ## Pathfinding with Dijkstra's Algorithm
 
@@ -129,10 +151,17 @@ Car.calculate_route() result:
 All pathfinding checks passed.
 ```
 
-Run the full simulation demonstration:
+Run the simulation engine prototype:
 
 ```bash
 python test_simulation.py
+```
+
+The console prints every rider request, dispatch, pickup, and dropoff in
+chronological order. A successful run ends with the final car locations and:
+
+```text
+All simulation engine checks passed.
 ```
 
 If `pytest` is installed, the same pathfinding checks can also be collected
