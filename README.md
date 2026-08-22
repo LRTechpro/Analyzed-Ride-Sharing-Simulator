@@ -1,172 +1,205 @@
 # Efficient, Analyzed Ride-Sharing Simulator
 
-## Purpose and Design
+This project is a deterministic discrete-event ride-sharing simulation. It
+integrates a coordinate-aware road graph, Dijkstra shortest-path routing, a
+Quadtree spatial index, dynamic rider generation, fleet state management,
+performance metrics, and a final analytical visualization.
 
-This project models the core components of a ride-sharing platform with clean,
-reusable Python classes. `Car`, `Rider`, `Graph`, and `Simulation` encapsulate
-the actors and state of the system. Cars and riders are stored in dictionaries
-by unique ID for average O(1) lookup, while the city map uses a weighted,
-directed adjacency list loaded from CSV.
+## Installation
 
-## Project Structure
-
-- `car.py`: Defines the `Car` class and its route-planning method.
-- `rider.py`: Defines the `Rider` class.
-- `graph.py`: Defines the weighted `Graph` and CSV-loading logic.
-- `pathfinding.py`: Implements Dijkstra's shortest-path algorithm.
-- `quadtree.py`: Implements the Quadtree spatial index and nearest-neighbor search.
-- `map.csv`: Defines the city nodes, roads, and travel times.
-- `simulation.py`: Implements the min-heap event engine and prototype logic.
-- `test_dijkstra.py`: Verifies standalone and car-integrated pathfinding.
-- `test_quadtree.py`: Validates Quadtree results against brute-force search.
-- `test_simulation.py`: Demonstrates the complete object model.
-
-## Simulation Engine Prototype
-
-The prototype connects the `Car`, `Rider`, and `Simulation` classes in a
-complete discrete-event simulation. Physical locations are represented as
-`(x, y)` coordinate tuples. The prototype intentionally uses simplified
-matching and navigation so the event loop and state changes can be validated
-before Dijkstra pathfinding and the Quadtree are integrated.
-
-Upcoming events are stored in a min-heap as
-`(timestamp, sequence_number, event_type, data)` tuples. The timestamp keeps
-events chronological, and the sequence number preserves insertion order when
-two events have the same timestamp. The `run()` loop removes the earliest
-event, advances the simulation clock, and sends it to the correct handler.
-
-For each rider request, `find_closest_car_brute_force()` checks every available
-car and returns the closest one. `calculate_travel_time()` uses Manhattan
-distance multiplied by `TRAVEL_SPEED_FACTOR`. An `ARRIVAL` event represents
-either a pickup or a dropoff. The handler distinguishes them by checking the
-car's status. At pickup, the car location changes to the rider's start
-coordinates. At dropoff, it changes to the rider's destination, the car becomes
-available again, and the rider-car link is cleared.
-
-## Pathfinding with Dijkstra's Algorithm
-
-`find_shortest_path(graph, start_node, end_node)` calculates the fastest route
-through the map. It uses Python's `heapq` module as a min-priority queue. Each
-heap entry is a `(distance, node)` tuple, so the closest known node is processed
-first.
-
-The algorithm maintains:
-
-- a distance dictionary containing the best travel time found for each node;
-- a predecessor dictionary used to reconstruct the final route;
-- a min-heap containing nodes that may still improve the route.
-
-For the included map, the fastest route from `A` to `D` is
-`A -> C -> D`, with a total travel time of 4. If a route is unavailable, the
-function returns `(None, float("inf"))`.
-
-`Car.calculate_route(destination, graph)` starts from the car's current
-`location`, calls the pathfinding function, and stores the result in the car's
-`route` and `route_time` attributes.
-
-### Complexity
-
-With an adjacency list and a binary min-heap, Dijkstra's algorithm runs in
-`O((V + E) log V)` time, commonly written as `O(E log V)` for a connected
-graph. The distance and predecessor dictionaries require `O(V)` space, while
-stale entries can make the heap grow to `O(E)`, giving `O(V + E)` auxiliary
-space in the worst case.
-
-## Quadtree Data Structure
-
-The Quadtree is a two-dimensional spatial index for matching a rider with the
-nearest available driver. Instead of scanning every driver in the fleet, it
-recursively divides the 1000-by-1000 map into northwest, northeast, southwest,
-and southeast regions. Each `QuadtreeNode` holds up to four points before it
-subdivides and redistributes those points among its children.
-
-`Quadtree.find_nearest(query_point)` performs a best-first recursive search.
-Child regions are ordered by their minimum possible distance from the rider.
-Once the search finds a candidate driver, any region whose closest boundary is
-farther than that driver is pruned. Every driver in a pruned branch is skipped.
-Squared distances are used during comparisons to avoid unnecessary square-root
-calculations.
-
-For a reasonably balanced tree and well-distributed points, insertion and
-nearest-neighbor search are approximately `O(log N)` on average. A brute-force
-nearest-neighbor search is `O(N)` because it always examines every driver.
-Quadtree construction requires `O(N)` space. Highly clustered or identical
-locations can produce an unbalanced tree, so worst-case search remains `O(N)`;
-the implementation also uses a maximum depth to handle duplicate locations
-safely.
-
-Run the standalone 5,000-driver verification:
+Python 3.10 or newer is required.
 
 ```bash
-python test_quadtree.py
+python -m pip install -r requirements.txt
 ```
 
-The script inserts 5,000 reproducible random driver points, selects a rider
-location, and runs both the Quadtree and a simple brute-force search. It asserts
-that both methods return the exact same `Point` object and prints their results
-and observed search times. A successful run ends with:
+Matplotlib is the only third-party runtime dependency.
 
-```text
-Results identical:      True
+## Project Files
 
-All Quadtree correctness checks passed.
-```
-
-## Map Data Format
-
-Each `map.csv` row describes one directed road:
-
-```text
-start_node,end_node,travel_time
-```
-
-For example, `A,B,5` creates a road from `A` to `B` with a travel time of 5.
-A two-way street requires one row for each direction. The loader accepts an
-optional header, ignores blank rows, validates three-column rows, and rejects
-negative weights.
+- `simulation.py`: event engine, dynamic requests, matching, metrics, CLI, and visualization
+- `car.py`: coordinate-based car state and route calculation
+- `rider.py`: rider state and timing fields
+- `graph.py`: unified map loader, adjacency list, coordinates, and vertex snapping
+- `pathfinding.py`: Dijkstra shortest-path algorithm
+- `quadtree.py`: insertion, identity-based removal, and pruned k-nearest search
+- `city_map.csv`: unified road topology and graph-node coordinates
+- `run_tests.py`: complete repeatable verification without pytest
+- `test_*.py`: focused correctness tests
+- `simulation_summary.png`: generated final map, metrics, and outcome chart
 
 ## How to Run
 
-Use Python 3.10 or newer. No third-party packages are required.
-
-Run the required Dijkstra demonstration:
+Run the full simulation with the required default candidate count of five:
 
 ```bash
-python test_dijkstra.py
+python simulation.py --max-time 200 --num-riders 25 --num-cars 100
 ```
 
-Expected result:
-
-```text
-Standalone Dijkstra result:
-  Path: ['A', 'C', 'D']
-  Total travel time: 4
-
-Car.calculate_route() result:
-  Car location: A
-  Destination: D
-  Car route: ['A', 'C', 'D']
-  Car route_time: 4
-
-All pathfinding checks passed.
-```
-
-Run the simulation engine prototype:
+Run a short video demonstration that begins with two simultaneous events:
 
 ```bash
-python test_simulation.py
+python simulation.py --max-time 40 --num-riders 10 --num-cars 5 --simultaneous-demo
 ```
 
-The console prints every rider request, dispatch, pickup, and dropoff in
-chronological order. A successful run ends with the final car locations and:
+The event log is printed in chronological order. The completed analytical
+output is saved as `simulation_summary.png`.
 
-```text
-All simulation engine checks passed.
+Run all correctness checks:
+
+```bash
+python run_tests.py
 ```
 
-If `pytest` is installed, the same pathfinding checks can also be collected
-automatically:
+If pytest is installed, the test files can also be collected with:
 
 ```bash
 python -m pytest -q
 ```
+
+## Command-Line Options
+
+| Option | Default | Purpose |
+|---|---:|---|
+| `--max-time` | `200` | Latest allowed rider-request generation time |
+| `--num-riders` | `25` | Maximum riders generated |
+| `--num-cars` | `100` | Initial fleet size |
+| `--candidate-count` | `5` | Maximum Quadtree candidates evaluated per request |
+| `--random-seed` | `549` | Makes generated inputs repeatable |
+| `--mean-arrival-time` | `8` | Mean exponential rider-arrival interval |
+| `--map-file` | `city_map.csv` | Unified graph and coordinate file |
+| `--summary-file` | `simulation_summary.png` | Visualization output path |
+| `--simultaneous-demo` | off | Schedules two initial requests at time zero |
+
+When both generation limits are supplied, generation stops when either limit
+is reached. Pickup and drop-off events already in the heap continue so active
+trips finish and the metrics remain consistent.
+
+## Unified Map Format
+
+Every `city_map.csv` row defines one bidirectional road:
+
+```text
+start_node_id,start_x,start_y,end_node_id,end_x,end_y,weight
+N00_00,0,0,N01_00,100,0,10
+```
+
+The graph stores roads in `adjacency_list` and physical node locations in
+`node_coordinates`. `find_nearest_vertex()` snaps arbitrary car or rider
+coordinates to the closest graph node before routing.
+
+## Event Engine
+
+The min-heap stores only four-field events:
+
+```text
+(timestamp, sequence_number, event_type, data)
+```
+
+Supported event types are:
+
+- `RIDER_REQUEST`
+- `PICKUP_ARRIVAL`
+- `DROPOFF_ARRIVAL`
+
+The timestamp orders events chronologically. A unique sequence number from
+`itertools.count()` preserves scheduling order when timestamps match and
+prevents `heapq` from comparing `Car` or `Rider` objects.
+
+## State Transitions
+
+Cars follow:
+
+```text
+available -> en_route_to_pickup -> en_route_to_destination -> available
+```
+
+Riders follow:
+
+```text
+waiting -> in_car -> completed
+```
+
+A rider becomes `unmatched` when no car is available or every candidate route
+is unreachable. A rider becomes `unsuccessful` if the destination becomes
+unreachable after pickup. The recovery path records elapsed busy time, clears
+the assignment, and returns the car to availability at the pickup coordinates.
+No event is scheduled at infinity.
+
+## Quadtree-to-Dijkstra Matching
+
+For every rider request:
+
+1. The available-car Quadtree returns up to `k` geographically nearest cars.
+2. `k` defaults to five and can be changed with `--candidate-count`.
+3. Dijkstra runs for every returned candidate.
+4. Unreachable candidates are skipped.
+5. The reachable car with the smallest road-network travel time is selected.
+6. Travel-time ties are resolved deterministically by candidate order and car ID.
+
+The Quadtree uses recursive rectangle-distance pruning and a size-k heap. It
+does not perform a full scan and sort as its primary k-nearest algorithm.
+
+## Availability Invariant
+
+The simulation maintains three synchronized structures:
+
+- `available_cars`: car ID to `Car`
+- `available_car_points`: car ID to the exact immutable `Point`
+- `available_car_quadtree`: spatial index containing only available cars
+
+All changes go through `add_available_car()` and `remove_available_car()`.
+Dispatch removes the exact Point by object identity before changing the car's
+status. The car stays absent during pickup and passenger travel. Drop-off
+updates its coordinates and inserts a new Point at the destination. This also
+handles multiple cars at identical coordinates correctly.
+
+## Metrics
+
+The simulation reports:
+
+- total riders generated
+- completed riders
+- unmatched or unsuccessful riders
+- average wait time: `pickup_time - request_time`
+- average completed-trip duration: `dropoff_time - pickup_time`
+- trips completed per car through `car.trips_completed`
+- number of Dijkstra evaluations
+- driver utilization
+
+Driver utilization is defined as:
+
+```text
+sum of all car busy times / (number of cars * final processed event time)
+```
+
+The final processed event time is used because active trips may finish after
+rider generation stops.
+
+## Analytical Visualization
+
+`simulation_summary.png` combines:
+
+- the road network and final location of every car
+- major simulation metrics
+- a completed-versus-unmatched rider chart
+
+The chronological console log remains available for debugging and the code
+review demonstration.
+
+## Complexity
+
+- Dijkstra with an adjacency list and binary heap: `O((V + E) log V)` time
+- Quadtree insertion and search: approximately `O(log N)` on balanced data,
+  with `O(N)` worst-case search for highly clustered points
+- Event scheduling and removal: `O(log M)` for `M` pending events
+- Graph, Quadtree, fleet, rider, and event state: linear auxiliary space
+
+## Correctness Coverage
+
+`run_tests.py` verifies equal-timestamp ordering, four-field events, coordinate
+snapping, Dijkstra routes, k-nearest ordering, nonpositive k rejection, exact
+Point identity removal, fewer than five cars, no available cars, unreachable
+candidates, all-unreachable candidate sets, dispatch exclusion, finite event
+times, completed-trip reinsertion, availability synchronization, active-trip
+completion, metrics, and PNG creation.

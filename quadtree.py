@@ -8,6 +8,8 @@ riders, or any other object with two-dimensional coordinates.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import heapq
+from itertools import count
 from math import inf
 from typing import Any
 
@@ -208,6 +210,50 @@ class QuadtreeNode:
 
         return best_point, minimum_distance_squared
 
+    def find_k_nearest(
+        self,
+        query_point: Point,
+        k: int,
+        candidates: list[tuple[float, int, Point]],
+        tie_breaker: count,
+    ) -> None:
+        """Populate a size-k max-heap while pruning distant branches."""
+        farthest = -candidates[0][0] if len(candidates) == k else inf
+        if self.boundary.distance_squared_to(query_point) > farthest:
+            return
+
+        for point in self.points:
+            distance_squared = (
+                (point.x - query_point.x) ** 2
+                + (point.y - query_point.y) ** 2
+            )
+            entry = (-distance_squared, -next(tie_breaker), point)
+            if len(candidates) < k:
+                heapq.heappush(candidates, entry)
+            elif distance_squared < -candidates[0][0]:
+                heapq.heapreplace(candidates, entry)
+
+        children = sorted(
+            self._children(),
+            key=lambda child: child.boundary.distance_squared_to(query_point),
+        )
+        for child in children:
+            farthest = -candidates[0][0] if len(candidates) == k else inf
+            if child.boundary.distance_squared_to(query_point) <= farthest:
+                child.find_k_nearest(query_point, k, candidates, tie_breaker)
+
+    def remove(self, point: Point) -> bool:
+        """Remove the exact Point object previously inserted."""
+        if not self.boundary.contains(point):
+            return False
+        for index, stored_point in enumerate(self.points):
+            if stored_point is point:
+                del self.points[index]
+                return True
+        if self.divided:
+            return self._child_for(point).remove(point)
+        return False
+
 
 class Quadtree:
     """Provide the public interface for a two-dimensional spatial index."""
@@ -234,3 +280,21 @@ class Quadtree:
         """Return the closest stored point, or None when the tree is empty."""
         nearest, _ = self.root.find_nearest(query_point)
         return nearest
+
+    def find_k_nearest(self, query_point: Point, k: int = 5) -> list[Point]:
+        """Return up to k points in nearest-to-farthest order."""
+        if k <= 0:
+            raise ValueError("k must be a positive integer.")
+        candidates: list[tuple[float, int, Point]] = []
+        self.root.find_k_nearest(query_point, k, candidates, count())
+        return [
+            entry[2]
+            for entry in sorted(
+                candidates,
+                key=lambda entry: (-entry[0], -entry[1]),
+            )
+        ]
+
+    def remove(self, point: Point) -> bool:
+        """Remove an inserted Point by object identity."""
+        return self.root.remove(point)

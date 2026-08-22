@@ -65,6 +65,36 @@ def test_nearest_matches_brute_force() -> None:
         )
 
 
+def test_k_nearest_matches_brute_force() -> None:
+    """Verify the pruned k-nearest search and its edge cases."""
+    points, query = build_test_data(500)
+    quadtree = Quadtree(Rectangle(0, 0, 1000, 1000), capacity=4)
+    assert all(quadtree.insert(point) for point in points)
+    expected = sorted(
+        points,
+        key=lambda point: distance_squared(point, query),
+    )[:5]
+    assert quadtree.find_k_nearest(query) == expected
+    assert len(quadtree.find_k_nearest(query, k=900)) == 500
+    try:
+        quadtree.find_k_nearest(query, k=0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("A nonpositive k must be rejected.")
+
+
+def test_remove_uses_point_identity_at_duplicate_coordinates() -> None:
+    """Remove one colocated car without removing another object."""
+    quadtree = Quadtree(Rectangle(0, 0, 100, 100), capacity=1)
+    first = Point(50, 50, data="CAR001")
+    second = Point(50, 50, data="CAR002")
+    assert quadtree.insert(first) and quadtree.insert(second)
+    assert quadtree.remove(first) is True
+    assert quadtree.remove(first) is False
+    assert quadtree.find_nearest(Point(50, 50)) is second
+
+
 def main() -> None:
     """Run the required 5,000-point correctness and timing comparison."""
     points, query_point = build_test_data()
@@ -83,6 +113,9 @@ def main() -> None:
 
     assert quadtree_result is brute_force_result
     assert quadtree_result is not None
+
+    test_k_nearest_matches_brute_force()
+    test_remove_uses_point_identity_at_duplicate_coordinates()
 
     distance = distance_squared(quadtree_result, query_point) ** 0.5
     print("--- Quadtree Nearest-Neighbor Verification ---")
